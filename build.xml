@@ -1,134 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <project name="SwissPaymentSlip" default="build">
-    <!--  By default, we assume all tools to be on the $PATH  -->
-    <property name="toolsdir" value=""/>
-    <!--
-     Uncomment the following when the tools are in ${basedir}/vendor/bin
-    -->
 
-    <property name="toolsdir" value="${basedir}/vendor/bin/"/>
+    <property name="tools_dir" value="${basedir}/vendor/bin"/>
+    <property name="build_dir" value="${basedir}/build"/>
+    <property name="vendor_dir" value="${basedir}/vendor"/>
 
-    <target name="build" depends="prepare,lint,phploc-ci,pdepend,phpmd-ci,phpcs-ci,phpcpd-ci,phpunit" description=""/>
-    <target name="build-parallel" depends="prepare,lint,tools-parallel,phpunit" description=""/>
-    <target name="tools-parallel" description="Run tools in parallel">
-        <parallel threadCount="2">
-            <sequential>
-                <antcall target="pdepend"/>
-                <antcall target="phpmd-ci"/>
-            </sequential>
-            <antcall target="phpcpd-ci"/>
-            <antcall target="phpcs-ci"/>
-            <antcall target="phploc-ci"/>
-        </parallel>
-    </target>
+    <condition property="script_ext" value=".bat" else="">
+        <os family="windows"/>
+    </condition>
+
+    <condition property="ds" value="\" else="/">
+        <os family="windows"/>
+    </condition>
+
+    <target name="build"
+            depends="clean,prepare,lint,phploc,pdepend,phpmd,phpcs,phpcpd,phpunit,apigen"/>
+
+    <target name="deploy"
+            depends="clean,prepare,phpunit,apigen"/>
+
+
     <target name="clean" unless="clean.done" description="Cleanup build artifacts">
-        <delete dir="${basedir}/build/api"/>
-        <delete dir="${basedir}/build/coverage"/>
-        <delete dir="${basedir}/build/logs"/>
-        <delete dir="${basedir}/build/pdepend"/>
-        <delete dir="${basedir}/build/phpdox"/>
+        <delete dir="${build_dir}/coverage"/>
+        <delete dir="${build_dir}/logs"/>
+        <delete dir="${build_dir}/pdepend"/>
         <property name="clean.done" value="true"/>
     </target>
     <target name="prepare" unless="prepare.done" depends="clean" description="Prepare for build">
-        <mkdir dir="${basedir}/build/api"/>
-        <mkdir dir="${basedir}/build/coverage"/>
-        <mkdir dir="${basedir}/build/logs"/>
-        <mkdir dir="${basedir}/build/pdepend"/>
-        <mkdir dir="${basedir}/build/phpdox"/>
+        <mkdir dir="${build_dir}/coverage"/>
+        <mkdir dir="${build_dir}/logs"/>
+        <mkdir dir="${build_dir}/pdepend"/>
+
         <property name="prepare.done" value="true"/>
+        <exec executable="composer${script_ext}">
+            <arg value="install" />
+            <arg value="--dev" />
+        </exec>
+
     </target>
     <target name="lint" description="Perform syntax check of sourcecode files">
         <apply executable="php" failonerror="true">
-            <arg value="-l"/>
-            <fileset dir="${basedir}/src">
-                <include name="**/*.php"/>
-                <modified/>
-            </fileset>
-            <fileset dir="${basedir}/tests">
-                <include name="**/*.php"/>
-                <modified/>
+            <arg value="-l" />
+
+            <fileset dir="${basedir}/">
+                <include name="**/*.php" />
+                <include name="**/examples/*.php" />
+                <include name="**/src/*.php" />
+                <include name="**/tests/*.php" />
+                <modified />
+                <exclude name="**/vendor/**" />
+                <exclude name="**/build/**" />
             </fileset>
         </apply>
     </target>
-    <target name="phploc" description="Measure project size using PHPLOC and print human readable output. Intended for usage on the command line.">
-        <exec executable="${toolsdir}phploc">
-            <arg value="--count-tests"/>
-            <arg path="${basedir}/src"/>
-            <arg path="${basedir}/tests"/>
+
+    <target name="phploc" depends="prepare" description="Measure project size using PHPLOC and log result in CSV and XML format. Intended for usage within a continuous integration environment.">
+        <exec executable="${tools_dir}/phploc${script_ext}">
+            <arg value="--names" />
+            <arg value="*.php"/>
+            <arg value="--log-csv" />
+            <arg value="${build_dir}/logs/phploc.csv" />
+            <arg value="--exclude"/>
+            <arg value="${vendor_dir}" />
+            <arg value="--exclude"/>
+            <arg value="${build_dir}" />
+            <arg path="${basedir}" />
         </exec>
     </target>
-    <target name="phploc-ci" depends="prepare" description="Measure project size using PHPLOC and log result in CSV and XML format. Intended for usage within a continuous integration environment.">
-        <exec executable="${toolsdir}phploc">
-            <arg value="--count-tests"/>
-            <arg value="--log-csv"/>
-            <arg path="${basedir}/build/logs/phploc.csv"/>
-            <arg value="--log-xml"/>
-            <arg path="${basedir}/build/logs/phploc.xml"/>
-            <arg path="${basedir}/src"/>
-            <arg path="${basedir}/tests"/>
-        </exec>
-    </target>
+
     <target name="pdepend" depends="prepare" description="Calculate software metrics using PHP_Depend and log result in XML format. Intended for usage within a continuous integration environment.">
-        <exec executable="${toolsdir}pdepend">
-            <arg value="--jdepend-xml=${basedir}/build/logs/jdepend.xml"/>
-            <arg value="--jdepend-chart=${basedir}/build/pdepend/dependencies.svg"/>
-            <arg value="--overview-pyramid=${basedir}/build/pdepend/overview-pyramid.svg"/>
-            <arg path="${basedir}/src"/>
+        <exec executable="${tools_dir}/pdepend${script_ext}">
+            <arg value="--jdepend-xml=${build_dir}/logs/jdepend.xml" />
+            <arg value="--jdepend-chart=${build_dir}/pdepend/dependencies.svg" />
+            <arg value="--overview-pyramid=${build_dir}/pdepend/overview-pyramid.svg" />
+            <arg value="--ignore=${vendor_dir}/*,${build_dir}/*" />
+            <arg path="${basedir}" />
         </exec>
     </target>
+
     <target name="phpmd" description="Perform project mess detection using PHPMD and print human readable output. Intended for usage on the command line before committing.">
-        <exec executable="${toolsdir}phpmd">
-            <arg path="${basedir}/src"/>
-            <arg value="text"/>
-            <arg path="${basedir}/build/phpmd.xml"/>
+        <exec executable="${tools_dir}/phpmd${script_ext}">
+            <arg path="${basedir}" />
+            <arg value="text" />
+            <arg value="${basedir}/phpmd.xml" />
+            <arg value="--exclude" />
+            <arg value="${vendor_dir}/*,${build_dir}/*" />
         </exec>
     </target>
-    <target name="phpmd-ci" depends="prepare" description="Perform project mess detection using PHPMD and log result in XML format. Intended for usage within a continuous integration environment.">
-        <exec executable="${toolsdir}phpmd">
-            <arg path="${basedir}/src"/>
-            <arg value="xml"/>
-            <arg path="${basedir}/build/phpmd.xml"/>
-            <arg value="--reportfile"/>
-            <arg path="${basedir}/build/logs/pmd.xml"/>
-        </exec>
-    </target>
+
+
     <target name="phpcs" description="Find coding standard violations using PHP_CodeSniffer and print human readable output. Intended for usage on the command line before committing.">
-        <exec executable="${toolsdir}phpcs">
-            <arg value="--standard=PSR2"/>
-            <arg value="--extensions=php"/>
+        <exec executable="${tools_dir}/phpcs${script_ext}">
+            <arg value="-p" />
+            <arg value="--report=checkstyle" />
+            <arg value="--report-file=${build_dir}/logs/checkstyle.xml" />
+            <arg value="--standard=PSR2" />
             <arg value="--ignore=autoload.php"/>
-            <arg path="${basedir}/src"/>
-            <arg path="${basedir}/tests"/>
+            <arg value="--ignore=${build_dir}/*,${vendor_dir}/*" />
+            <arg path="${basedir}" />
         </exec>
     </target>
-    <target name="phpcs-ci" depends="prepare" description="Find coding standard violations using PHP_CodeSniffer and log result in XML format. Intended for usage within a continuous integration environment.">
-        <exec executable="${toolsdir}phpcs" output="/dev/null">
-            <arg value="--report=checkstyle"/>
-            <arg value="--report-file=${basedir}/build/logs/checkstyle.xml"/>
-            <arg value="--standard=PSR2"/>
-            <arg value="--extensions=php"/>
-            <arg value="--ignore=autoload.php"/>
-            <arg path="${basedir}/src"/>
-        </exec>
-    </target>
+
     <target name="phpcpd" description="Find duplicate code using PHPCPD and print human readable output. Intended for usage on the command line before committing.">
-        <exec executable="${toolsdir}phpcpd">
-            <arg path="${basedir}/src"/>
+        <exec executable="${tools_dir}/phpcpd${script_ext}">
+
+            <arg value="--log-pmd" />
+            <arg value="${build_dir}/logs/pmd-cpd.xml" />
+            <arg value="--exclude" />
+            <arg value="build" />
+            <arg value="--exclude" />
+            <arg value="vendor" />
+            <arg path="${basedir}" />
         </exec>
     </target>
-    <target name="phpcpd-ci" depends="prepare" description="Find duplicate code using PHPCPD and log result in XML format. Intended for usage within a continuous integration environment.">
-        <exec executable="${toolsdir}phpcpd">
-            <arg value="--log-pmd"/>
-            <arg path="${basedir}/build/logs/pmd-cpd.xml"/>
-            <arg path="${basedir}/src"/>
+
+    <target name="apigen" description="Generate API documentation using apigen">
+        <mkdir dir="${build_dir}/api"/>
+
+        <exec executable="${tools_dir}/apigen${script_ext}">
+            <arg value="generate" />
+            <arg value="--source" />
+            <arg value="${basedir}/src/" />
+            <arg value="--source" />
+            <arg value="${basedir}/tests/" />
+            <arg value="--exclude" />
+            <arg value="${vendor_dir}" />
+            <arg value="--exclude" />
+            <arg value="${build_dir}" />
+            <arg value="--destination" />
+            <arg value="${build_dir}/api/" />
+            <arg value="--download" />
+            <arg value="--todo" />
+            <arg value="--internal" />
+            <arg value="--deprecated" />
+            <arg value="--php" />
+            <arg value="--debug" />
+            <arg value="--groups" />
+            <arg value="packages" />
+            <arg value="--title" />
+            <arg value="'SwissPaymentSlip'" />
         </exec>
     </target>
     <target name="phpunit" depends="prepare" description="Run unit tests with PHPUnit">
-        <exec executable="${toolsdir}phpunit" failonerror="true">
-            <arg value="--configuration"/>
-            <arg path="${basedir}/build/phpunit.xml"/>
+        <exec executable="${tools_dir}/phpunit" failonerror="true">
+            <arg value="--log-junit" />
+            <arg value="${build_dir}/logs/junit.xml" />
+            <arg value="--coverage-clover" />
+            <arg value="${build_dir}/logs/clover.xml" />
+            <arg value="--configuration" />
+            <arg value="${basedir}/phpunit.xml" />
+            <arg value="--configuration" />
+            <arg value="${basedir}/phpunit-html-coverage.xml" />
         </exec>
-    </target>
-    <target name="phpdox" depends="phploc-ci,phpcs-ci,phpmd-ci" description="Generate project documentation using phpDox">
-        <exec executable="${toolsdir}phpdox" dir="${basedir}/build"/>
     </target>
 </project>
