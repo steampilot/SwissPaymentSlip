@@ -20,6 +20,6 @@
         </whitelist>
     </filter>
     <logging>
-        <log type="coverage-html" target="report/coverage/" charset="UTF-8"/>
+        <log type="coverage-html" target="build/coverage/" charset="UTF-8"/>
     </logging>
 </phpunit>
