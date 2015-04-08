@@ -16,6 +16,5 @@ Thumbs.db
 
 # Project specific files #
 ##########################
-phpunit.xml
 vendor
-report
+build
