@@ -81,10 +81,12 @@
     <target name="phpmd" description="Perform project mess detection using PHPMD and print human readable output. Intended for usage on the command line before committing.">
         <exec executable="${tools_dir}/phpmd${script_ext}">
             <arg path="${basedir}" />
-            <arg value="text" />
+            <arg value="xml" />
             <arg value="${basedir}/phpmd.xml" />
             <arg value="--exclude" />
             <arg value="${vendor_dir}/*,${build_dir}/*" />
+            <arg value="--reportfile" />
+            <arg value="${build_dir}/logs/pmd.xml" />
         </exec>
     </target>
 
