@@ -85,6 +85,8 @@
             <arg value="${basedir}/phpmd.xml" />
             <arg value="--exclude" />
             <arg value="${vendor_dir}/*,${build_dir}/*" />
+            <arg value="--reportfile" />
+            <arg value="${build_dir}/logs/pmd.xml" />
         </exec>
     </target>
 
